@@ -177,8 +177,9 @@ def crc_compensate(buf, at, want):
     assert zlib.crc32(buf) == want
 
 
-def patch(fw, fake_rfid=False, rfid_count=None, rfid_1a=None, rfid_59=None):
+def patch(fw, fake_rfid=False, allow_untagged=False, rfid_count=None, rfid_1a=None, rfid_59=None):
     import hashlib
+    allow_untagged = allow_untagged or fake_rfid   # fake-rfid includes the error suppression
     hdr, main, aux, crc_a, ver = parse(fw)
 
     # Sanity: reset handler must be the Keil stub at 0x08002374, i.e. the main image really
@@ -202,13 +203,15 @@ def patch(fw, fake_rfid=False, rfid_count=None, rfid_1a=None, rfid_59=None):
     assert main[setter:setter + 4] == SETTER_FROM
     main[setter:setter + 4] = SETTER_TO
 
-    info = dict(ver=ver, loader=loader, setter=setter, fake=None)
+    info = dict(ver=ver, loader=loader, setter=setter, fake=None, untagged=False)
+
+    rec = FAKE_RFID.get(main_sha) if allow_untagged else None
+    if allow_untagged and rec is None:
+        opt = "--fake-rfid" if fake_rfid else "--allow-untagged"
+        sys.exit(f"{opt}: no pre-assembled patch for this exact firmware build "
+                 f"(main sha256 {main_sha[:16]}…). Only tested builds are supported.")
 
     if fake_rfid:
-        rec = FAKE_RFID.get(main_sha)
-        if rec is None:
-            sys.exit("--fake-rfid: no pre-assembled cave for this exact firmware build "
-                     f"(main sha256 {main_sha[:16]}…). Only tested builds are supported.")
         if rfid_1a is None:
             sys.exit("--fake-rfid needs YOUR genuine 100x150 roll's 0x1a reply via --rfid-1a <hex>.\n"
                      "Capture it with:  python3 tools/b4rfid_read.py   (genuine roll loaded)")
@@ -241,13 +244,19 @@ def patch(fw, fake_rfid=False, rfid_count=None, rfid_1a=None, rfid_59=None):
             main[hk:hk + 4] = new
             for off, data in writes:
                 main[off:off + len(data)] = data
-        # Suppress the RFID "error 20" so the print preflight (cmd 0x01) proceeds.
-        em = rec["errmap"]
-        if main[em:em + 2] != rec["errmap_orig"]:
-            sys.exit("--fake-rfid: unexpected bytes at the error-code map")
-        main[em:em + 2] = rec["errmap_new"]
         info["fake"] = dict(hook=rec["hook1a"], cave=rec["cave1a"], hook59=rec["hook59"], cave59=rec["cave59"],
-                            errmap=em, count=struct.unpack(">H", blob1[-2:])[0])
+                            count=struct.unpack(">H", blob1[-2:])[0])
+
+    if allow_untagged:
+        # Suppress the RFID-not-valid "error 20" so the print preflight (cmd 0x01) proceeds with
+        # no tag present. Needed to print an untagged roll at all (separate from cfg[0x2f]); included
+        # by --fake-rfid, and the whole of --allow-untagged on its own (no fake identity).
+        em = rec["errmap"]
+        if main[em:em + 2] not in (rec["errmap_orig"], rec["errmap_new"]):
+            sys.exit("error-code map: unexpected bytes")
+        main[em:em + 2] = rec["errmap_new"]
+        info["untagged"] = True
+        info["errmap"] = em
 
     crc_compensate(main, COMPENSATE_AT, crc_a)
     out = hdr + bytes(main) + aux
@@ -272,9 +281,14 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("firmware", help="official B4_<ver>.bin")
     ap.add_argument("-o", "--output")
+    ap.add_argument("--allow-untagged", action="store_true",
+                    help="also let the printer PRINT with no tag present, by suppressing the print "
+                         "preflight's RFID-not-valid error (0x14 / WriteRfidFail). Needed to print an "
+                         "untagged roll from niim.blue; set the label size yourself. 1.20 only. "
+                         "(implies --norfid; no fake identity, so the official app still won't recognise)")
     ap.add_argument("--fake-rfid", action="store_true",
-                    help="also make the printer report a 100x150 roll when no tag is present, so the "
-                         "official app recognises non-genuine 100x150 paper (implies the norfid patch; "
+                    help="go further and make the printer REPORT a 100x150 roll when no tag is present, so "
+                         "the official app recognises non-genuine 100x150 paper (implies --allow-untagged; "
                          "experimental, 1.20 only; needs --rfid-1a)")
     hexbytes = lambda s: bytes.fromhex(s.replace(" ", "").replace(":", ""))
     ap.add_argument("--rfid-1a", type=hexbytes, default=None,
@@ -301,14 +315,17 @@ def main():
         print(f"ok      header CRC, main CRC, aux CRC valid; version byte {ver & 0xff:#x}")
         return
 
-    out, info = patch(fw, fake_rfid=a.fake_rfid, rfid_count=a.rfid_count,
-                      rfid_1a=a.rfid_1a, rfid_59=a.rfid_59)
-    suffix = "_fakerfid_crcfix.bin" if a.fake_rfid else "_norfid_crcfix.bin"
+    out, info = patch(fw, fake_rfid=a.fake_rfid, allow_untagged=a.allow_untagged,
+                      rfid_count=a.rfid_count, rfid_1a=a.rfid_1a, rfid_59=a.rfid_59)
+    suffix = ("_fakerfid_crcfix.bin" if a.fake_rfid
+              else "_untagged_crcfix.bin" if a.allow_untagged else "_norfid_crcfix.bin")
     name = a.output or a.firmware.rsplit(".", 1)[0] + suffix
     open(name, "wb").write(out)
 
     print(f"loader  {BASE + info['loader']:08x}  cfg[0x2f] forced to 0 at boot")
     print(f"setter  {BASE + info['setter']:08x}  cmd 0x2f payload 1 stores 0")
+    if info["untagged"]:
+        print(f"untag   {BASE + info['errmap']:08x}  print preflight RFID error 0x14 -> OK (print with no tag)")
     if info["fake"]:
         f = info["fake"]
         print(f"fake    0x1a {BASE + f['hook']:08x}->{BASE + f['cave']:08x}, "
