@@ -1,13 +1,17 @@
-# NIIMBOT B21 Pro: full heat on non-RFID labels
+# NIIMBOT B21 Pro and B4: printing on non-RFID labels
 
 The B21 Pro reads an RFID tag on every label roll. If the tag is missing or unknown, the firmware
 falls back to a minimal heat value and prints are barely visible. This repository contains a
 firmware patch that removes that restriction, so third-party rolls print as dark as original ones.
 
-Status: working, tested on a B21 Pro running patched 3.10 with original and no-name rolls.
+> **New: NIIMBOT B4 support.** `tools/b4patch.py` patches B4 firmware 1.16, 1.18 and 1.20 so the B4
+> prints on rolls without a genuine tag. `--allow-untagged` is tested on 1.20; `--fake-rfid` is experimental.
+> See [B4: printing on non-genuine rolls](#b4-printing-on-non-genuine-rolls).
+
+**B21 Pro** status: working, tested on a B21 Pro running patched 3.10 with original and no-name rolls.
 The patchers support firmware 3.09, 3.10, 3.11, 3.12 and 3.13.
 
-Three tools, from simple to complete:
+B21 Pro tools, from simple to complete:
 
 | Tool | What you get |
 |---|---|
@@ -16,6 +20,8 @@ Three tools, from simple to complete:
 | `tools/make_firmware.py` | **tune v1**: all of the above plus gray load and 1-bit heat set per print job by the app. No dependencies |
 
 ## Quick start
+
+For the B4, see [the B4 section](#b4-printing-on-non-genuine-rolls). For the B21 Pro:
 
 1. Get an official image `B21_Pro_<version>.bin` (e.g. from the niim.blue firmware mirror,
    fw.niim.blue) and check it against the hashes below.
