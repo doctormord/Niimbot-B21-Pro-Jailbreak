@@ -5,7 +5,15 @@ falls back to a minimal heat value and prints are barely visible. This repositor
 firmware patch that removes that restriction, so third-party rolls print as dark as original ones.
 
 Status: working, tested on a B21 Pro running patched 3.10 with original and no-name rolls.
-The patcher supports firmware 3.09, 3.10, 3.11, 3.12 and 3.13.
+The patchers support firmware 3.09, 3.10, 3.11, 3.12 and 3.13.
+
+Three tools, from simple to complete:
+
+| Tool | What you get |
+|---|---|
+| `tools/b21patch.py` | full heat on rolls without a tag (the original jailbreak) |
+| `tools/b21graypatch.py` | the above plus a better 16-level gray curve |
+| `tools/make_firmware.py` | **tune v1**: all of the above plus gray load and 1-bit heat set per print job by the app. No dependencies |
 
 ## Quick start
 
@@ -16,12 +24,17 @@ The patcher supports firmware 3.09, 3.10, 3.11, 3.12 and 3.13.
    python3 tools/b21patch.py B21_Pro_3.10.bin
    # -> B21_Pro_3.10_noprime10_crcfix.bin
    ```
+   or build tune v1 (see below):
+   ```sh
+   python3 tools/make_firmware.py B21_Pro_3.10.bin --all
+   # -> B21_Pro_3.10_tune-v1.bin
+   ```
 3. Flash it with the firmware updater on [niim.blue](https://niim.blue) (USB or Bluetooth), or
    with the [B21Pro app](https://github.com/doctormord/B21Pro-Simple-Printing-and-Photobooth-App)
    over Bluetooth (long-press the title to open the debug console). Enter the version that matches
    the file. Keep the printer charged and connected until it reboots.
 
-The patcher needs Python 3 and nothing else. `--verify` additionally disassembles the patched code
+`b21patch.py` and `make_firmware.py` need Python 3 and nothing else. `--verify` additionally disassembles the patched code
 (requires `pip install capstone`).
 
 ## Gray mode: better 16-level grayscale
@@ -33,7 +46,7 @@ increments and the load compensation of the gray path. The 1-bit path is not tou
 ```sh
 pip install capstone
 python3 tools/b21graypatch.py B21_Pro_3.10_noprime10_crcfix.bin --load 2
-# -> B21_Pro_3.10_noprime10_crcfix_graycum_load200_crcfix.bin
+# -> B21_Pro_3.10_noprime10_graycum_load200_crcfix.bin
 ```
 
 - On 3.09 to 3.11 the default mode is RFID-aware: a genuine gray roll keeps the stock curve,
@@ -45,6 +58,30 @@ python3 tools/b21graypatch.py B21_Pro_3.10_noprime10_crcfix.bin --load 2
 - `tools/b21_gray_editor.html` does the same in a browser, with a live chart of the curve:
   open the file locally, load an image, download the patched one. Nothing is uploaded.
 - Both produce byte-identical files; the output keeps the 28-byte header and restores the CRC.
+
+## Tune v1: gray load and 1-bit heat per print job
+
+`tools/make_firmware.py` builds everything above from an official image and adds two controls
+that the app sends with each print job, so one firmware fits every paper:
+
+- **gray load:** the gray load compensation in % of stock, separately for planes 1..15 and for plane 0.
+  Replaces the fixed `--load` builds.
+- **1-bit heat:** every 1-bit strobe pulse in % of stock, on top of the density setting.
+
+```sh
+python3 tools/make_firmware.py                          # guided: choose the file, then patches or "all"
+python3 tools/make_firmware.py B21_Pro_3.10.bin --all   # -> B21_Pro_3.10_tune-v1.bin
+python3 tools/make_firmware.py B21_Pro_3.10.bin --patches unlock,curve
+```
+
+- The app sends `00 01 00 00 00 00 <mode> 01 <load> <load0> <heat1bit>` as the print start.
+  A 0 or missing byte means stock, so the official app's 9-byte start keeps working.
+- Patches can be chosen one by one (`unlock`, `curve`, `load`, `heat`). `unlock` alone gives the same file as
+  `b21patch.py`; `unlock,curve` gives the same file as `b21graypatch.py --profile graycum` (checked on all five versions).
+- **Only 3.10 is tested on paper.** 3.09, 3.11, 3.12 and 3.13 carry the same code at their own addresses and
+  were checked in emulation only. On 3.12 and 3.13 the gray curve applies to genuine gray rolls too.
+
+Bytes, addresses, the print-start format and known paper settings: [docs/firmware-v1.md](docs/firmware-v1.md).
 
 This repository never contains firmware images, neither official nor patched. Download the
 official image yourself and patch it locally.
@@ -258,8 +295,10 @@ b0f4c40f4c0071a0addead4d862b4fc542121ce76fabf9f15e55258e792de1b6  B21_Pro_3.13.b
 | `tools/b21patch.py`  | the full-heat patcher (non-RFID rolls)                         |
 | `tools/b21graypatch.py` | gray-mode patcher (curve, load term, RFID-aware caves)      |
 | `tools/b21_gray_editor.html` | the same as a browser tool with a live curve chart    |
+| `tools/make_firmware.py` | tune v1 builder: unlock, curve, per-job gray load and 1-bit heat (no dependencies) |
 | `tools/b4patch.py`   | B4: RFID enforcement off (`--norfid`), print untagged rolls (`--allow-untagged`), or fake a roll for the app (`--fake-rfid`) |
 | `tools/b4rfid_read.py` | B4: read a genuine roll's RFID replies over USB (for `--fake-rfid`) |
+| `docs/firmware-v1.md` | tune v1: what each patch changes, print-start format, per-version table |
 | `docs/gray-mode.md`  | how gray works in the firmware, variants, measurements        |
 | `history.md`         | chronological log of the analysis, including the dead ends    |
 | `rea.md`             | reverse-engineering setup: Ghidra on Apple Silicon, headless import, tooling |
@@ -268,7 +307,7 @@ b0f4c40f4c0071a0addead4d862b4fc542121ce76fabf9f15e55258e792de1b6  B21_Pro_3.13.b
 
 - [niimbluelib / niim.blue](https://github.com/MultiMote/niimbluelib) by MultiMote for the
   documented NIIMBOT protocol and the firmware updater.
-- Ghidra and capstone.
+- Ghidra, capstone and unicorn.
 
 ## Disclaimer
 

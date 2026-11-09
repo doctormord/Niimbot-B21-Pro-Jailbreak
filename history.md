@@ -100,6 +100,14 @@ addresses (located by byte-signature search and verified with capstone).
 
 ---
 
+## Phase 9 — Tune v1 (2026-11-03 .. 11-04)
+- Gray load and 1-bit heat became per-job values: three extra bytes in the print start (command `0x01`),
+  stored by a cave hooked into **both** print-start parse paths (hooking only one had no effect on paper).
+- 1-bit heat first scaled the wrong values (per-row tables, then only the rest pulse); the working version
+  scales every 1-bit strobe pulse where the timer reload is set.
+- `tools/make_firmware.py`: one standalone byte patcher for 3.09-3.13. Only 3.10 printed on paper, the
+  others emulated. 3.12/3.13: 3 instead of 6 1-bit sites, curve for all rolls. Details: `docs/firmware-v1.md`.
+
 ## Timeline summary (machine-readable)
 ```yaml
 phases:
@@ -112,5 +120,6 @@ phases:
   - id: alwaysvalid;  result: solved;   note: "force RFID success -> roll+9=1; prime-then-swap dark"
   - id: no-prime;     result: solved;   note: "cave sets roll+0x67=0x10 default; no priming needed"
   - id: rollout;      result: solved;   note: "3.09-3.13 built + verified"
-confirmed_on_device: [A-crc, alwaysvalid, no-prime(3.10)]
+  - id: tune-v1;      result: solved;   note: "per-job gray load + 1-bit heat; 3.10 paper, 3.09-3.13 emulated"
+confirmed_on_device: [A-crc, alwaysvalid, no-prime(3.10), tune-v1(3.10)]
 ```

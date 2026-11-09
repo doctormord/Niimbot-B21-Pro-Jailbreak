@@ -11,6 +11,9 @@ full heat. Everything else adds a gray-heat change on top of that base.
 
 Current best for photos (2026-10-27): **`*_graycum_load200_crcfix.bin`**.
 
+Since 2026-11-03 the load no longer has to be fixed per build: **tune v1** (`tools/make_firmware.py`)
+takes the gray load per print job from the app. See [firmware-v1.md](firmware-v1.md).
+
 ## How grayscale actually works (reverse-engineered, emulation-confirmed)
 
 - Each gray level L has a per-level **increment** `c_L`, computed in the setup function
@@ -71,7 +74,7 @@ Jailbreak repo for SWD/UART recovery.
 
 ## Backlog / open
 
-- Pick the final load factor from paper (load200 leading).
+- ~~Pick the final load factor from paper~~: replaced by the per-job load in tune v1 (40×40 no-name: load 25, load0 50).
 - Re-measure the per-paper tone curve (full-width band chart averages out the load effect) and feed
   the in-app calibration; a dithered photo has lower per-plane load than a solid band, so a
   band-measured curve over-estimates photo darkness until the load term is tuned.
