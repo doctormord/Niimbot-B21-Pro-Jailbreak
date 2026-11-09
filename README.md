@@ -196,6 +196,86 @@ Documented so nobody has to repeat them:
 - **Reading the calibration.** The `0x55` protocol (USB or BLE) has `GET_RFID` (`0x1a`) and
   `GET_INFO` (`0x40`) but no memory read; the heat calibration is only accessible over SWD.
 
+## B4: printing on non-genuine rolls
+
+`tools/b4patch.py` patches B4 firmware 1.16, 1.18 and 1.20. The B4 does not throttle heat; it gates
+on RFID at **two independent points**, so there are two patch levels. All of them keep the header and
+both section CRCs byte-identical (CRC-neutral bytes in reserved vector slot 7 of the main image).
+
+**`--norfid` (all versions).** A persistent config byte (`cfg+0x2f`, loaded from `0x0803f000`) makes
+the printer refuse (status `0xfd`) when the tag is missing or the roll's counter is used up. It
+defaults on (erased flash reads `0xff`, which the loader turns into 1) and the app sets it with
+command `0x2f`. The patch makes the loader always store 0 and the `0x2f` handler never store 1.
+
+```sh
+python3 tools/b4patch.py B4_1.20.bin --verify   # -> B4_1.20_norfid_crcfix.bin
+```
+
+**`--allow-untagged` (1.20, tested) — the niim.blue path.** `--norfid` alone is *not enough to
+print*: the print preflight (`cmd 0x01`) has a separate RFID check that, with no tag, sets a
+"RFID not valid" fault bit and rejects the job with error `0x14` (niimbluelib `WriteRfidFail`) —
+regardless of `cfg+0x2f`. `--allow-untagged` additionally makes that one error map to OK, so an
+untagged roll prints. No tag is faked, so you set the label size yourself in niim.blue. Use
+**continuous / fixed length** — a transmissive gap sensor can't find the gap on paper with an opaque
+liner, so gap mode may still mis-feed; continuous sidesteps it.
+
+```sh
+python3 tools/b4patch.py B4_1.20.bin --allow-untagged   # -> B4_1.20_untagged_crcfix.bin
+```
+
+### `--fake-rfid` (1.20, experimental): making the official app accept non-genuine 100×150 paper
+
+The `--norfid` patch only stops the *printer* refusing. Clients (the official NIIMBOT app and
+niim.blue) do their own RFID handling, through two separate firmware queries, so `--fake-rfid`
+replays a genuine 100×150 roll's reply on both no-tag branches:
+
+- `0x1a` ("get RFID") — read for **recognition**; without it the app shows "Label paper not
+  recognized". The fake replays the genuine 42-byte tag payload.
+- `0x59` ("get RFID print params") — the **print** engine gates on this; a no-tag reply makes the
+  print preflight fail with error `0x14` (niimbluelib `WriteRfidFail`). The fake replays the genuine
+  18-byte params reply.
+
+It also includes the `--allow-untagged` error suppression (the preflight `0x14`), since the fake roll
+still has no physical tag. All of this — the two replies, the error code, and the fact that there is
+no RFID write-back on the wire — was read from a `usbmon` capture of a real 100×150 print diffed
+against a failing one. Genuine rolls are untouched (their valid flag is 1, so neither no-tag branch is
+taken). `--fake-rfid` implies `--allow-untagged` (and `--norfid`).
+
+**You supply the tag identity.** The `0x1a` reply contains a roll's UID, barcode and serial, which
+identify one physical consumable, so none is shipped here. Load a genuine 100×150 roll, capture its
+replies, and pass them in:
+
+```sh
+pip install pyserial
+python3 tools/b4rfid_read.py                 # genuine 100×150 roll loaded -> prints --rfid-1a <hex>
+python3 tools/b4patch.py B4_1.20.bin --fake-rfid --rfid-1a <hex> --verify
+#   -> B4_1.20_fakerfid_crcfix.bin
+python3 tools/b4patch.py B4_1.20.bin --fake-rfid --rfid-1a <hex> --rfid-count 999   # more labels
+```
+
+The `0x59` print-params reply ships as a generic 100×150 profile (it has no UID/serial/barcode);
+override it with `--rfid-59 <hex>` if your roll's geometry differs.
+
+Caveats: the cave bytes are pre-assembled and position-specific, so this mode is keyed by the
+main-image SHA-256 and currently only has the **1.20** cave. The app tracks label usage per tag UID,
+so a fixed identity may eventually hit the app's own label-count limit (`--rfid-count` sets the
+reported total). Status: **experimental.** Confirmed on hardware to make the printer report the roll
+and to print from niim.blue; the remaining open issue is gap registration — a transmissive gap
+sensor cannot see the gap on paper with an opaque liner, so die-cut third-party rolls may need a
+continuous-mode / fixed-length workflow instead. For niim.blue-only use, `--allow-untagged` (above,
+tested) is simpler and has no tag-identity or app-counter considerations.
+
+Differences from the B21 Pro: the main image is linked at `0x08002000` behind an 8 KB bootloader,
+the file carries a second (aux) image with its own CRC, the header CRC at `0x18` is
+`crc32({0x18,0,0,0} + header[4:0x18])`, and the updater refuses versions older than the running
+one, so recovery means flashing the official image of the same version (or newer).
+
+| Version | SHA-256 (official)                                                 | Loader     | Setter     |
+|---------|--------------------------------------------------------------------|------------|------------|
+| 1.16    | `6afb975a5bc0acbd493542b452b28f812fd1b5e7c0966e237430d0e5845b0f10` | `08020682` | `08017516` |
+| 1.18    | `ed077ece62f7129ece1a97674b8fa4e891a83124d40f292c5253fdac51739f9a` | `080206a2` | `0801753a` |
+| 1.20    | `18926fc9476cd70f7aa0da64c40aabebdd64b2a384b30bacc69d8176c5b823e5` | `08020896` | `0801758e` |
+
 ## Firmware hashes (SHA-256)
 
 Official:
@@ -216,6 +296,8 @@ b0f4c40f4c0071a0addead4d862b4fc542121ce76fabf9f15e55258e792de1b6  B21_Pro_3.13.b
 | `tools/b21graypatch.py` | gray-mode patcher (curve, load term, RFID-aware caves)      |
 | `tools/b21_gray_editor.html` | the same as a browser tool with a live curve chart    |
 | `tools/make_firmware.py` | tune v1 builder: unlock, curve, per-job gray load and 1-bit heat (no dependencies) |
+| `tools/b4patch.py`   | B4: RFID enforcement off (`--norfid`), print untagged rolls (`--allow-untagged`), or fake a roll for the app (`--fake-rfid`) |
+| `tools/b4rfid_read.py` | B4: read a genuine roll's RFID replies over USB (for `--fake-rfid`) |
 | `docs/firmware-v1.md` | tune v1: what each patch changes, print-start format, per-version table |
 | `docs/gray-mode.md`  | how gray works in the firmware, variants, measurements        |
 | `history.md`         | chronological log of the analysis, including the dead ends    |
