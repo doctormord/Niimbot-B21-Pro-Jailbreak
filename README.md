@@ -23,8 +23,8 @@ B21 Pro tools, from simple to complete:
 
 For the B4, see [the B4 section](#b4-printing-on-non-genuine-rolls). For the B21 Pro:
 
-1. Get an official image `B21_Pro_<version>.bin` (e.g. from the niim.blue firmware mirror,
-   fw.niim.blue) and check it against the hashes below.
+1. Obtain the official image `B21_Pro_<version>.bin` for your printer yourself and check it
+   against the hashes below. This repository does not host, mirror or link firmware files.
 2. Patch it:
    ```sh
    python3 tools/b21patch.py B21_Pro_3.10.bin
@@ -89,8 +89,9 @@ python3 tools/make_firmware.py B21_Pro_3.10.bin --patches unlock,curve
 
 Bytes, addresses, the print-start format and known paper settings: [docs/firmware-v1.md](docs/firmware-v1.md).
 
-This repository never contains firmware images, neither official nor patched. Download the
-official image yourself and patch it locally.
+This repository never contains firmware images, neither official nor patched, and none was ever
+committed. Obtain the official image yourself and patch it locally; patched images are for your
+own printer and should not be redistributed.
 
 ## How the throttle works
 
@@ -308,6 +309,7 @@ b0f4c40f4c0071a0addead4d862b4fc542121ce76fabf9f15e55258e792de1b6  B21_Pro_3.13.b
 | `docs/gray-mode.md`  | how gray works in the firmware, variants, measurements        |
 | `history.md`         | chronological log of the analysis, including the dead ends    |
 | `rea.md`             | reverse-engineering setup: Ghidra on Apple Silicon, headless import, tooling |
+| `LICENSE`            | MIT license for the code and documentation in this repository  |
 
 ## Credits
 
@@ -319,4 +321,18 @@ b0f4c40f4c0071a0addead4d862b4fc542121ce76fabf9f15e55258e792de1b6  B21_Pro_3.13.b
 
 For printers you own. Flashing modified firmware voids the warranty and can damage the device.
 Printing with more heat on unknown label stock wears the print head faster. Not affiliated with
-NIIMBOT.
+or endorsed by NIIMBOT; product names are used only to describe compatibility.
+
+The analysis was done on official, unmodified firmware images for printers the authors own, to
+make them interoperate with third-party label stock and independent client software. This
+repository contains original code and documentation only: no firmware images, no decompiled
+source code, and no roll identities (UID, barcode, serial). The only firmware-derived content is
+the few original bytes the tools check at each patch site and a handful of stock parameter values
+used to locate and verify them.
+
+Everything here is provided as is, without warranty of any kind; you use it at your own risk.
+
+## License
+
+MIT, see [LICENSE](LICENSE). The license covers the code and documentation in this repository
+only, not NIIMBOT firmware or anything derived from it.
