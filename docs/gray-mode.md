@@ -1,13 +1,15 @@
 # B21 Pro gray mode: how it works and which variants exist
 
-Patched NIIMBOT B21 Pro firmware images for **better 16-level grayscale**, built on top of the
-`noprime10` full-heat patch. Everything here keeps the 28-byte header byte-identical and restores
-`crc32(body) == header[0x08]` by solving the reserved Cortex-M vector word at `0x0800001C`
-(GF(2) linear system), so the printer accepts the update. **None of these is a NIIMBOT release.**
+Patch variants for NIIMBOT B21 Pro firmware for **better 16-level grayscale**, built on top of the
+`noprime10` full-heat patch. The images named below are built locally by the tools from an
+official image; none of them is distributed here. Everything here keeps the 28-byte header
+byte-identical and restores `crc32(body) == header[0x08]` by solving the reserved Cortex-M vector
+word at `0x0800001C` (GF(2) linear system), so the printer accepts the update. **None of these is
+a NIIMBOT release.**
 
-The official images are not part of this repository (download them yourself, see README).
-`Niimbot-B21-Jailbreak` repo (`tools/b21patch.py`): they make non-RFID / unknown rolls print at
-full heat. Everything else adds a gray-heat change on top of that base.
+The official images are not part of this repository (obtain them yourself, see README).
+The base is the `noprime10` patch from `tools/b21patch.py`: it makes non-RFID / unknown rolls
+print at full heat. Everything else adds a gray-heat change on top of that base.
 
 Current best for photos (2026-10-27): **`*_graycum_load200_crcfix.bin`**.
 

@@ -9,8 +9,12 @@ status: SOLVED and confirmed on device
 two_problems:
   A: make a modified firmware pass the printer's integrity/CRC checks (flashable)
   B: defeat the heat throttle that triggers when no valid RFID tag is present
-outcome_files: firmware/B21_Pro_{3.09,3.10,3.11,3.12,3.13}_noprime10_crcfix.bin
+outcome: tools/b21patch.py (builds B21_Pro_<ver>_noprime10_crcfix.bin locally, 3.09-3.13)
 ```
+
+> All `firmware/...` paths below refer to the author's local working directory. No firmware
+> image, official or patched, is or was ever part of this repository; the tools build patched
+> images locally from an official image the user obtains themselves.
 
 This is a chronological, human- and machine-readable log of what was done and why.
 Addresses are for firmware **3.10** unless noted; other versions share the structure at shifted
@@ -94,9 +98,10 @@ addresses (located by byte-signature search and verified with capstone).
 - Device: **no-name prints dark with no tag ever, default `0x10` confirmed good.** (Problem B solved.)
 
 ## Phase 8 — Roll-out
-- Applied `alwaysvalid` + `no-prime(0x10)` to **3.09/3.10/3.11/3.12/3.13**, both always-valid code
+- Applied (locally) `alwaysvalid` + `no-prime(0x10)` to **3.09/3.10/3.11/3.12/3.13**, both always-valid code
   forms handled, each located by signature and verified (header unchanged, `crc32(body)==[8:12]`).
-- Deliverables: `firmware/B21_Pro_<ver>_noprime10_crcfix.bin`. Full description in `README.md`.
+- Result: images `B21_Pro_<ver>_noprime10_crcfix.bin`, built locally (not distributed); the
+  logic is in `tools/b21patch.py`. Full description in `README.md`.
 
 ---
 
