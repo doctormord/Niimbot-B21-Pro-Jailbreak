@@ -323,11 +323,12 @@ For printers you own. Flashing modified firmware voids the warranty and can dama
 Printing with more heat on unknown label stock wears the print head faster. Not affiliated with
 or endorsed by NIIMBOT; product names are used only to describe compatibility.
 
-The analysis was done on lawfully obtained firmware to make the printer interoperate with
-third-party label stock and independent client software. This repository contains original code
-and documentation only: no firmware images, no decompiled source code, and no roll identities
-(UID, barcode, serial). The only firmware-derived content is the few original bytes the tools
-check at each patch site and a handful of stock parameter values used to locate and verify them.
+The analysis was done on official, unmodified firmware images for printers the authors own, to
+make them interoperate with third-party label stock and independent client software. This
+repository contains original code and documentation only: no firmware images, no decompiled
+source code, and no roll identities (UID, barcode, serial). The only firmware-derived content is
+the few original bytes the tools check at each patch site and a handful of stock parameter values
+used to locate and verify them.
 
 Everything here is provided as is, without warranty of any kind; you use it at your own risk.
 
