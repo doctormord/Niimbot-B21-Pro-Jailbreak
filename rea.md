@@ -7,6 +7,9 @@ key_outcome: a working Ghidra decompiler for mac_arm_64 (built from source) + Th
 note: the analysis tools live in an EPHEMERAL per-session scratchpad; this file lets you rebuild them
 ```
 
+`firmware/...` paths refer to the author's local working directory; firmware images are not part
+of this repository. Obtain the official image yourself.
+
 All commands assume macOS + Homebrew. The scratchpad path below was session-specific and may not
 persist; recreate a working dir and adjust `SCRATCH` as needed.
 
