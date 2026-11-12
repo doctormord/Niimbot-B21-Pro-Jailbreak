@@ -84,9 +84,6 @@ Notes:
 - `keystone-engine` (assembler) **could not** be installed (Python 3.15 removed `distutils`;
   `ModuleNotFoundError: No module named 'distutils'`). Not required — the few Thumb branches
   (B.W/BL/CBNZ/narrow-B) were hand-encoded and then **verified by disassembling with capstone**.
-- jadx was installed (`brew install jadx`) but **not** ultimately used; the APK was inspected by
-  unzipping + `strings`. (REA's Android provider needs a caller-supplied `jadx-headless-mcp` JAR via
-  `REA_JADX_MCP_JAR`, which was not set up.)
 
 ## 6. Loading the firmware in Ghidra (headless)
 The .bin has a 28-byte header; strip it so the body maps at `0x08000000`:
@@ -106,8 +103,8 @@ Re-run scripts against the saved project without re-analyzing:
   -scriptPath "$SCRATCH/gscripts" -postScript DecompAt.java 0x08013b34 0x0800e004
 ```
 Scripts used (in `$SCRATCH/gscripts/`):
-- `DecompAt.java` — decompile the function containing each given address (creates the function and
-  sets Thumb/TMode if Ghidra missed it); prints pseudo-C.
+- `DecompAt.java` — prints Ghidra's analysis of the function containing each given address (creates
+  the function and sets Thumb/TMode if Ghidra missed it); used locally, output not kept.
 - `Callers.java` — list references/callers of the function containing an address.
 
 ## 7. The printer over USB (optional, for inspection)
@@ -137,6 +134,5 @@ jdk: openjdk@21 (21.0.13.0.2)  # JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/
 ghidra: 12.1.4 PUBLIC (ghidra_12.1.4_PUBLIC_20260921.zip)
 ghidra_decompiler: built from source for mac_arm_64 (make ghidra_opt ARCH_TYPE="-arch arm64" ADDITIONAL_FLAGS="-w")
 python_pkgs: {capstone: 5.0.7, pyserial: "3.5", keystone-engine: FAILED(distutils-missing, not needed)}
-jadx: installed via brew but unused
 firmware_target: ARM:LE:32:Cortex, base 0x08000000, 28-byte header stripped for analysis
 ```
