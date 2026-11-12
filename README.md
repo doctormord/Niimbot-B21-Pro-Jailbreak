@@ -262,20 +262,18 @@ pip install pyserial
 python3 tools/b4rfid_read.py                 # genuine 100×150 roll loaded -> prints --rfid-1a <hex>
 python3 tools/b4patch.py B4_1.20.bin --fake-rfid --rfid-1a <hex> --verify
 #   -> B4_1.20_fakerfid_crcfix.bin
-python3 tools/b4patch.py B4_1.20.bin --fake-rfid --rfid-1a <hex> --rfid-count 999   # more labels
 ```
 
 The `0x59` print-params reply ships as a generic 100×150 profile (it has no UID/serial/barcode);
 override it with `--rfid-59 <hex>` if your roll's geometry differs.
 
 Caveats: the cave bytes are pre-assembled and position-specific, so this mode is keyed by the
-main-image SHA-256 and currently only has the **1.20** cave. The app tracks label usage per tag UID,
-so a fixed identity may eventually hit the app's own label-count limit (`--rfid-count` sets the
-reported total). Status: **experimental.** Confirmed on hardware to make the printer report the roll
+main-image SHA-256 and currently only has the **1.20** cave. The replayed reply is your roll's own,
+unchanged, including its label count. Status: **experimental.** Confirmed on hardware to make the printer report the roll
 and to print from niim.blue; the remaining open issue is gap registration — a transmissive gap
 sensor cannot see the gap on paper with an opaque liner, so die-cut third-party rolls may need a
 continuous-mode / fixed-length workflow instead. For niim.blue-only use, `--allow-untagged` (above,
-tested) is simpler and has no tag-identity or app-counter considerations.
+tested) is simpler and needs no tag identity.
 
 Differences from the B21 Pro: the main image is linked at `0x08002000` behind an 8 KB bootloader,
 the file carries a second (aux) image with its own CRC, the header CRC at `0x18` is
