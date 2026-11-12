@@ -177,7 +177,7 @@ def crc_compensate(buf, at, want):
     assert zlib.crc32(buf) == want
 
 
-def patch(fw, fake_rfid=False, allow_untagged=False, rfid_count=None, rfid_1a=None, rfid_59=None):
+def patch(fw, fake_rfid=False, allow_untagged=False, rfid_1a=None, rfid_59=None):
     import hashlib
     allow_untagged = allow_untagged or fake_rfid   # fake-rfid includes the error suppression
     hdr, main, aux, crc_a, ver = parse(fw)
@@ -219,10 +219,6 @@ def patch(fw, fake_rfid=False, allow_untagged=False, rfid_count=None, rfid_1a=No
         lo, hi = 20, rec["blob1a_max"]
         if not lo <= len(blob1) <= hi:
             sys.exit(f"--rfid-1a must be {lo}..{hi} bytes (got {len(blob1)})")
-        if rfid_count is not None:
-            if not 1 <= rfid_count <= 0xFFFF:
-                sys.exit("--rfid-count must be 1..65535")
-            blob1[-2:] = struct.pack(">H", rfid_count)   # 0x1a [0x68] label count, big-endian
         blob59 = bytes(rfid_59) if rfid_59 is not None else rec["blob59_default"]
         if len(blob59) != 18:
             sys.exit("--rfid-59 must be exactly 18 bytes")
@@ -297,13 +293,11 @@ def main():
     ap.add_argument("--rfid-59", type=hexbytes, default=None,
                     help="with --fake-rfid: hex of the 18-byte 0x59 print-params reply (default: a generic "
                          "100x150 profile; override if your roll's geometry differs)")
-    ap.add_argument("--rfid-count", type=lambda s: int(s, 0), default=None,
-                    help="with --fake-rfid: label count reported to the app (default: whatever --rfid-1a carries)")
     ap.add_argument("--verify", action="store_true", help="disassemble patched code (needs capstone)")
     ap.add_argument("--check", action="store_true", help="only validate the input image")
     a = ap.parse_args()
-    if (a.rfid_count is not None or a.rfid_1a is not None or a.rfid_59 is not None) and not a.fake_rfid:
-        sys.exit("--rfid-1a/--rfid-59/--rfid-count only apply with --fake-rfid")
+    if (a.rfid_1a is not None or a.rfid_59 is not None) and not a.fake_rfid:
+        sys.exit("--rfid-1a/--rfid-59 only apply with --fake-rfid")
 
     fw = open(a.firmware, "rb").read()
     import hashlib
@@ -316,7 +310,7 @@ def main():
         return
 
     out, info = patch(fw, fake_rfid=a.fake_rfid, allow_untagged=a.allow_untagged,
-                      rfid_count=a.rfid_count, rfid_1a=a.rfid_1a, rfid_59=a.rfid_59)
+                      rfid_1a=a.rfid_1a, rfid_59=a.rfid_59)
     suffix = ("_fakerfid_crcfix.bin" if a.fake_rfid
               else "_untagged_crcfix.bin" if a.allow_untagged else "_norfid_crcfix.bin")
     name = a.output or a.firmware.rsplit(".", 1)[0] + suffix
