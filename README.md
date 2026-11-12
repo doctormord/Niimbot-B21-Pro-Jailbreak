@@ -1,5 +1,10 @@
 # NIIMBOT B21 Pro and B4: printing on non-RFID labels
 
+> [!WARNING]
+> This project is intended for informational and educational purposes only. It is not affiliated
+> with or endorsed by NIIMBOT. Flashing modified firmware voids the warranty and can damage your
+> printer; use it only on printers you own and at your own risk.
+
 The B21 Pro reads an RFID tag on every label roll. If the tag is missing or unknown, the firmware
 falls back to a minimal heat value and prints are barely visible. This repository contains a
 firmware patch that removes that restriction, so third-party rolls print as dark as original ones.
@@ -168,7 +173,7 @@ The printer checks the image twice:
   (`0x9d 00`).
 
 So a patched body needs a new CRC, but a new CRC breaks the header hash, and the two hash fields
-did not match any standard CRC variant. Instead of cracking them, the patch keeps the header
+did not match any standard CRC variant. Instead of reproducing them, the patch keeps the header
 byte-identical and makes the body's CRC unchanged. CRC-32 is affine over GF(2): flipping bits at a
 fixed position changes the CRC by a fixed XOR pattern. With 4 free bytes, a 32×32 linear system
 gives the exact values that restore the original CRC. The free bytes are the reserved Cortex-M

@@ -91,7 +91,7 @@ addresses (located by byte-signature search and verified with capstone).
   **no-name printed DARK.** (Density lived in RAM from the prior read.) First success.
 
 ## Phase 7 — "No-prime" final version
-- To avoid any priming and survive power-off: a code-cave detour from `FUN_0800df8c` that does
+- To avoid any priming and survive power-off: a code-cave detour from `FUN_0800df8c` that
   sets `roll[+0x67]` to `0x10` when it is still 0 (default density 16). Real tags keep their own density
   (skip when nonzero). Cave placed in a zero-padding run; branches hand-encoded and
   **capstone-verified**; CRC-neutralized.
