@@ -8,7 +8,7 @@ date: 2026-10-24
 status: SOLVED and confirmed on device
 two_problems:
   A: make a modified firmware pass the printer's integrity/CRC checks (flashable)
-  B: defeat the heat throttle that triggers when no valid RFID tag is present
+  B: make rolls without a valid RFID tag print at normal heat (the firmware reduces heat for them)
 outcome: tools/b21patch.py (builds B21_Pro_<ver>_noprime10_crcfix.bin locally, 3.09-3.13)
 ```
 
@@ -34,9 +34,9 @@ addresses (located by byte-signature search and verified with capstone).
 1. Dumped and decoded the 28-byte header of all 5 originals. Fields (LE):
    `[0:4]`=hash(custom), `[4:8]`=body length (file−28), `[8:12]`=`crc32(body)` (zlib),
    `[12:20]`=0, `[20:24]`=version, `[24:28]`=hash(custom).
-2. Brute-forced a full CRC catalog (all standard poly/init/reflect variants, STM32 hardware-CRC,
+2. Tested a full CRC catalog (all standard poly/init/reflect variants, STM32 hardware-CRC,
    self-referential) over every header slice → **no match** for `[0:4]`/`[24:28]`. They use a
-   custom algorithm; not worth cracking.
+   custom algorithm; not pursued further.
 3. Diffed original vs `_fullheat`/`_keephdr` → confirmed model: printer checks a header integrity
    early (covers `[8:12]`) and `crc32(body)==[8:12]` at the end.
 4. **Insight:** CRC32 is linear → keep the header byte-identical, apply the body patch, then adjust
@@ -60,11 +60,12 @@ addresses (located by byte-signature search and verified with capstone).
   headless with a decompile script. capstone used for Thumb disassembly + patch verification.
 
 ## Phase 4 — Mapping the real energy/strobe path
-- Real per-roll energy is computed in `FUN_08013b34` (big command dispatcher), case 1:
-  `if (roll[+9]==1) energy = base * density(roll[+0x67]/+0x77/+0x6e...) * 11.81 → strobe[+0x1c0]`
-  else `strobe[+0x1c0]=0`. Roll struct `0x2000176c`, strobe struct `0x2000c5e8`, base `0x20000610`.
-- Consumer `FUN_080146c8`: if `strobe[+0x1c0]==0` **or** `strobe[+0x210]+[+0x1c0] > cap[+0x1ba]`
-  → minimal fallback `r0=0xe` (this IS the stock faint output). The cap is derived from `base`,
+- Real per-roll energy is computed in `FUN_08013b34` (big command dispatcher), case 1: for a valid
+  roll (`roll[+9]==1`) it is roughly base × density (from `roll[+0x67]` and related fields) × 11.81 and
+  goes to `strobe[+0x1c0]`; otherwise `strobe[+0x1c0]` is set to 0. Roll struct `0x2000176c`,
+  strobe struct `0x2000c5e8`, base `0x20000610`.
+- Consumer `FUN_080146c8`: if that energy is 0 **or** exceeds a cap (`+0x1ba`) together with `+0x210`,
+  it uses a minimal fallback `r0=0xe` (this IS the stock faint output). The cap is derived from `base`,
   not from the tag.
 - Tried: inject energy into `+0x1c0`, raise the `0xe` floor, inject density (fakecal, force-valid +
   constants). Device: **blank / 50% hang (head-protection) / non-monotonic.** The strobe timing is
@@ -91,7 +92,7 @@ addresses (located by byte-signature search and verified with capstone).
 
 ## Phase 7 — "No-prime" final version
 - To avoid any priming and survive power-off: a code-cave detour from `FUN_0800df8c` that does
-  `if (roll[+0x67]==0) roll[+0x67]=0x10` (default density 16). Real tags keep their own density
+  sets `roll[+0x67]` to `0x10` when it is still 0 (default density 16). Real tags keep their own density
   (skip when nonzero). Cave placed in a zero-padding run; branches hand-encoded and
   **capstone-verified**; CRC-neutralized.
 - Energy now runs through the **real** firmware formula (cap-bounded) → consistent timing, no hang.
